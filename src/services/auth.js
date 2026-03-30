@@ -22,7 +22,7 @@ export const setSessionCookies = (res, session) => {
     httpOnly: true,
     secure: isProd, // ❗
     sameSite: isProd ? 'none' : 'lax', // ❗
-    maxAge: FIFTEEN_MINUTES,
+    maxAge: ONE_DAY,
   });
 
   res.cookie('refreshToken', session.refreshToken, {
