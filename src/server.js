@@ -19,18 +19,23 @@ const PORT = process.env.PORT || 30001;
 app.use(bodyParser.json({ limit: '10mb' }));
 app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
 
+const corsOptions = {
+  origin: [
+    'http://localhost:3000',
+    'http://localhost:3001',
+    'https://www.stanislavkochubey.cz',
+    'https://stanislavkochubey.cz',
+    'https://photography-back-2iok.onrender.com',
+  ],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  credentials: true,
+  optionsSuccessStatus: 200,
+};
+
 // Или если используете express.json()
 app.use(express.json({ limit: '10mb' }));
-app.use(
-  cors({
-    origin: [
-      'http://localhost:3001',
-      'https://www.stanislavkochubey.cz',
-      'https://stanislavkochubey.cz',
-    ],
-    credentials: true,
-  }),
-);
+app.use(cors(corsOptions));
 app.use(cookieParser());
 app.use(logger);
 
