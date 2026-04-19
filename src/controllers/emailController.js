@@ -4,6 +4,12 @@ import createHttpError from 'http-errors';
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 export const sendContactEmail = async (req, res, next) => {
+    console.log('=== ОТРИМАНО ЗАПИТ ===');
+    console.log('Headers:', JSON.stringify(req.headers, null, 2));
+    console.log('Content-Type:', req.headers['content-type']);
+    console.log('Body:', req.body);
+    console.log('Body type:', typeof req.body);
+    console.log('Body keys:', req.body ? Object.keys(req.body) : 'no body');
   try {
     const { name, email, phone, comment } = req.body;
 
