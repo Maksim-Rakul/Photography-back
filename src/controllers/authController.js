@@ -3,6 +3,7 @@ import createHttpError from 'http-errors';
 import { User } from '../models/user.js';
 import { createSession, setSessionCookies } from '../services/auth.js';
 import { Session } from '../models/session.js';
+import jwt from 'jsonwebtoken';
 
 // export const registerUser = async (req, res) => {
 //   const { email, password } = req.body;
@@ -94,4 +95,83 @@ export const refreshUserSession = async (req, res) => {
   res.status(200).json({
     message: 'Session refreshed',
   });
+};
+
+export const adminLogin = async (req, res, next) => {
+  try {
+    const { email, password } = req.body;
+
+    // Перевірка через змінні середовища (безпечніше)
+    const adminEmail = process.env.ADMIN_EMAIL;
+    const adminPassword = process.env.ADMIN_PASSWORD;
+
+    if (!adminEmail || !adminPassword) {
+      console.error('ADMIN_EMAIL or ADMIN_PASSWORD not set in environment');
+      throw createHttpError(500, 'Admin credentials not configured');
+    }
+
+    if (email !== adminEmail || password !== adminPassword) {
+      throw createHttpError(401, 'Невірний email або пароль');
+    }
+
+    // Створення JWT токену
+    const token = jwt.sign(
+      {
+        email: adminEmail,
+        role: 'admin',
+        type: 'admin_access',
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' },
+    );
+
+    res.json({
+      token,
+      email: adminEmail,
+      message: 'Успішний вхід в адмін-панель',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// НОВА ФУНКЦІЯ: Перевірка токену
+export const verifyToken = async (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      throw createHttpError(401, 'Токен не надано');
+    }
+
+    const token = authHeader.split(' ')[1];
+
+    if (!token) {
+      throw createHttpError(401, 'Токен не надано');
+    }
+
+    // Перевірка токену
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    // Додаткова перевірка: чи це адмін-токен
+    if (decoded.role !== 'admin') {
+      throw createHttpError(403, 'Недостатньо прав');
+    }
+
+    res.json({
+      valid: true,
+      user: {
+        email: decoded.email,
+        role: decoded.role,
+      },
+    });
+  } catch (error) {
+    if (error.name === 'JsonWebTokenError') {
+      next(createHttpError(401, 'Невірний токен'));
+    } else if (error.name === 'TokenExpiredError') {
+      next(createHttpError(401, 'Токен застарів'));
+    } else {
+      next(error);
+    }
+  }
 };
