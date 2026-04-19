@@ -8,6 +8,7 @@ import { notFoundHandler } from './middleware/notFoundHandler.js';
 import authRoutes from './routes/authRouter.js';
 import imagesRoutes from './routes/imagesRoutes.js';
 import adminImagesRoutes from './routes/adminImagesRouter.js';
+import emailRoutes from './routes/emailRouter.js';
 import { errors } from 'celebrate';
 import cookieParser from 'cookie-parser';
 import bodyParser from 'body-parser';
@@ -22,8 +23,12 @@ app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
 app.use(express.json({ limit: '10mb' }));
 app.use(
   cors({
-    origin: 'http://localhost:3001', // URL фронтенду
-    credentials: true, // щоб cookies передавались
+    origin: [
+      'http://localhost:3001',
+      'https://www.stanislavkochubey.cz',
+      'https://stanislavkochubey.cz',
+    ],
+    credentials: true,
   }),
 );
 app.use(cookieParser());
@@ -33,6 +38,7 @@ app.use(logger);
 app.use('/auth', authRoutes);
 app.use('/images', imagesRoutes);
 app.use('/admin/images', adminImagesRoutes);
+app.use('/api', emailRoutes);
 
 // Middleware 404
 app.use(notFoundHandler);
