@@ -30,8 +30,9 @@ router.post(
 
 // ВАЖНО: Специфический маршрут должен быть перед динамическим
 router.patch('/reorder', reorderImages); // 👈 переместите сюда
+router.put('/reorder', reorderImages); // 👈 переместите сюда
 
-router.patch(
+router.put(
   '/:imageId', // 👈 динамический маршрут должен быть после специфических
   upload.array('images', 20),
   celebrate(updateImageSchema),

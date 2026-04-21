@@ -21,6 +21,8 @@ export const getImagesById = async (req, res) => {
   res.status(200).json(img);
 };
 
+//==================================================== CREATE
+
 export const createImage = async (req, res) => {
   if (!req.files || req.files.length === 0) {
     throw createHttpError(400, 'No files');
@@ -115,110 +117,67 @@ export const reorderImages = async (req, res) => {
   console.log('\n=== REORDER IMAGES CONTROLLER ===');
   console.log('Request method:', req.method);
   console.log('Request URL:', req.url);
-  console.log('User:', req.user); // из middleware authenticate
+  console.log('Request headers:', req.headers);
+  console.log('Request body:', req.body);
   console.log('Request body type:', typeof req.body);
-  console.log('Request body:', JSON.stringify(req.body, null, 2));
+  console.log('User:', req.user);
 
   const { items } = req.body;
 
-  // Проверка наличия items
+  // Перевірка наявності items
   if (!items) {
     console.error('❌ ERROR: items is missing');
     return res.status(400).json({
       error: 'Invalid request',
-      details: 'items field is required'
+      details: 'items field is required',
     });
   }
 
-  // Проверка что items - массив
+  // Перевірка, що items - масив
   if (!Array.isArray(items)) {
     console.error(`❌ ERROR: items is not an array, type: ${typeof items}`);
     return res.status(400).json({
       error: 'Invalid request',
-      details: 'items must be an array'
+      details: 'items must be an array',
     });
   }
 
   console.log(`📦 Processing ${items.length} items`);
 
-  // Проверка каждого элемента
+  // Перевірка кожного елемента
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
     console.log(`\n--- Item ${i} ---`);
     console.log('item:', item);
 
-    // Проверка наличия _id
     if (!item._id) {
       console.error(`❌ Item ${i} missing _id`);
       return res.status(400).json({
         error: 'Invalid request',
-        details: `Item at index ${i} missing _id`
+        details: `Item at index ${i} missing _id`,
       });
     }
 
-    // Проверка формата _id
-    const mongoose = await import('mongoose');
-    const isValid = mongoose.default.Types.ObjectId.isValid(item._id);
-    console.log(`_id "${item._id}" isValid: ${isValid}`);
-
-    if (!isValid) {
-      console.error(`❌ Invalid ObjectId format: ${item._id}`);
-      return res.status(400).json({
-        error: 'Invalid request',
-        details: `Invalid _id format: "${item._id}" at index ${i}`
-      });
-    }
-
-    // Проверка наличия order
     if (item.order === undefined || item.order === null) {
       console.error(`❌ Item ${i} missing order`);
       return res.status(400).json({
         error: 'Invalid request',
-        details: `Item at index ${i} missing order`
+        details: `Item at index ${i} missing order`,
       });
     }
 
-    // Проверка типа order
     if (typeof item.order !== 'number') {
-      console.error(`❌ Item ${i} order is not a number, type: ${typeof item.order}`);
+      console.error(
+        `❌ Item ${i} order is not a number, type: ${typeof item.order}`,
+      );
       return res.status(400).json({
         error: 'Invalid request',
-        details: `Order must be a number for item ${i}`
+        details: `Order must be a number for item ${i}`,
       });
     }
   }
 
-  // Импортируем модель Image
-
-  // Проверяем существование всех записей
-  const ids = items.map(item => item._id);
-  console.log('\n🔍 Checking existence in database...');
-  console.log('IDs to check:', ids);
-
-  try {
-    const existingImages = await Image.find({ _id: { $in: ids } });
-    console.log(`Found ${existingImages.length} images in database`);
-
-    if (existingImages.length !== ids.length) {
-      const existingIds = existingImages.map(img => img._id.toString());
-      const missingIds = ids.filter(id => !existingIds.includes(id));
-      console.error('❌ Missing images:', missingIds);
-      return res.status(400).json({
-        error: 'Invalid request',
-        details: `Images not found: ${missingIds.join(', ')}`
-      });
-    }
-
-    console.log('✅ All images exist in database');
-  } catch (dbError) {
-    console.error('❌ Database query error:', dbError);
-    return res.status(500).json({
-      error: 'Database error',
-      details: dbError.message
-    });
-  }
-
-  // Выполняем обновление
+  // Виконуємо оновлення
   const bulkOps = items.map((item) => ({
     updateOne: {
       filter: { _id: item._id },
@@ -234,21 +193,21 @@ export const reorderImages = async (req, res) => {
     console.log('✅ Bulk write result:', {
       matchedCount: result.matchedCount,
       modifiedCount: result.modifiedCount,
-      upsertedCount: result.upsertedCount
+      upsertedCount: result.upsertedCount,
     });
 
     res.status(200).json({
       message: 'Order updated successfully',
       result: {
         matchedCount: result.matchedCount,
-        modifiedCount: result.modifiedCount
-      }
+        modifiedCount: result.modifiedCount,
+      },
     });
   } catch (err) {
     console.error('❌ Bulk write failed:', err);
     res.status(500).json({
       error: 'Database error',
-      details: err.message
+      details: err.message,
     });
   }
 };
