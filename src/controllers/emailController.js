@@ -27,7 +27,7 @@ export const sendContactEmail = async (req, res, next) => {
     // Відправка email через Resend
     const { data, error } = await resend.emails.send({
       from: 'Photography message <onboarding@resend.dev>',
-      to: ['mrakul84@gmail.com'],
+      to: ['info@stanislavkochubey.cz'],
       subject: `Нове повідомлення від ${name}`,
       replyTo: email,
       html: `
