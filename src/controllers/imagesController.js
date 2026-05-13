@@ -1,14 +1,19 @@
 import { Image } from '../models/image.js';
 import createHttpError from 'http-errors';
-import { uploadToCloudinary } from '../utils/uploadToCloudinary.js';
-import cloudinary from '../config/cloudinary.js';
 import mongoose from 'mongoose';
+import {
+  uploadImage,
+  deleteImage as deleteFromR2,
+  getImage,
+} from '../utils/r2-upload.js';
 
+//==================================================== GET ALL
 export const getImages = async (req, res) => {
-  const images = await Image.find().sort({ order: 1 }); // 👈 важливо
+  const images = await Image.find().sort({ order: 1 });
   res.status(200).json(images);
 };
 
+//==================================================== GET BY ID
 export const getImagesById = async (req, res) => {
   const { imageId } = req.params;
 
@@ -22,7 +27,6 @@ export const getImagesById = async (req, res) => {
 };
 
 //==================================================== CREATE
-
 export const createImage = async (req, res) => {
   if (!req.files || req.files.length === 0) {
     throw createHttpError(400, 'No files');
@@ -31,16 +35,20 @@ export const createImage = async (req, res) => {
   const uploadedImages = [];
 
   const lastImage = await Image.findOne().sort({ order: -1 });
-
   let currentOrder = lastImage ? lastImage.order + 1 : 0;
 
   for (const file of req.files) {
-    const result = await uploadToCloudinary(file.buffer);
+    // 🟢 Використовуємо R2 замість Cloudinary
+    const result = await uploadImage(
+      file.buffer,
+      file.originalname,
+      file.mimetype,
+    );
 
     const image = await Image.create({
-      url: result.secure_url,
-      publicId: result.public_id,
-      order: currentOrder++, // 👈 інкремент
+      url: result.url, // ← змінилось: result.url замість result.secure_url
+      publicId: result.key, // ← змінилось: result.key замість result.public_id
+      order: currentOrder++,
     });
 
     uploadedImages.push(image);
@@ -50,7 +58,6 @@ export const createImage = async (req, res) => {
 };
 
 //==================================================== DELETE
-
 export const deleteImage = async (req, res) => {
   const { imageId } = req.params;
 
@@ -66,9 +73,10 @@ export const deleteImage = async (req, res) => {
 
   if (image.publicId) {
     try {
-      await cloudinary.uploader.destroy(image.publicId);
+      // 🟢 Видаляємо з R2 замість Cloudinary
+      await deleteFromR2(image.publicId);
     } catch (err) {
-      console.error('Cloudinary delete failed:', err);
+      console.error('R2 delete failed:', err);
       // не кидаємо 500, просто лог
     }
   }
@@ -78,8 +86,7 @@ export const deleteImage = async (req, res) => {
   res.status(200).json({ message: 'Deleted' });
 };
 
-//==================================================== DELETE
-
+//==================================================== UPDATE
 export const updateImage = async (req, res) => {
   const { imageId } = req.params;
 
@@ -92,16 +99,20 @@ export const updateImage = async (req, res) => {
   let updateData = {};
 
   if (req.file) {
-    // 🧹 видаляємо стару
+    // 🧹 видаляємо старе зображення з R2
     if (image.publicId) {
-      await cloudinary.uploader.destroy(image.publicId);
+      await deleteFromR2(image.publicId);
     }
 
-    // ☁️ нова
-    const result = await uploadToCloudinary(req.file.buffer);
+    // ☁️ завантажуємо нове в R2
+    const result = await uploadImage(
+      req.file.buffer,
+      req.file.originalname,
+      req.file.mimetype,
+    );
 
-    updateData.url = result.secure_url;
-    updateData.publicId = result.public_id;
+    updateData.url = result.url; // ← змінилось
+    updateData.publicId = result.key; // ← змінилось
   }
 
   const updatedImage = await Image.findByIdAndUpdate(imageId, updateData, {
@@ -111,20 +122,15 @@ export const updateImage = async (req, res) => {
   res.status(200).json(updatedImage);
 };
 
-// Ваш бекенд роутер з покращеним логуванням
-// controllers/imagesController.js
+//==================================================== REORDER (без змін)
 export const reorderImages = async (req, res) => {
   console.log('\n=== REORDER IMAGES CONTROLLER ===');
   console.log('Request method:', req.method);
   console.log('Request URL:', req.url);
-  console.log('Request headers:', req.headers);
   console.log('Request body:', req.body);
-  console.log('Request body type:', typeof req.body);
-  console.log('User:', req.user);
 
   const { items } = req.body;
 
-  // Перевірка наявності items
   if (!items) {
     console.error('❌ ERROR: items is missing');
     return res.status(400).json({
@@ -133,7 +139,6 @@ export const reorderImages = async (req, res) => {
     });
   }
 
-  // Перевірка, що items - масив
   if (!Array.isArray(items)) {
     console.error(`❌ ERROR: items is not an array, type: ${typeof items}`);
     return res.status(400).json({
@@ -144,7 +149,6 @@ export const reorderImages = async (req, res) => {
 
   console.log(`📦 Processing ${items.length} items`);
 
-  // Перевірка кожного елемента
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
     console.log(`\n--- Item ${i} ---`);
@@ -177,7 +181,6 @@ export const reorderImages = async (req, res) => {
     }
   }
 
-  // Виконуємо оновлення
   const bulkOps = items.map((item) => ({
     updateOne: {
       filter: { _id: item._id },
@@ -186,14 +189,12 @@ export const reorderImages = async (req, res) => {
   }));
 
   console.log('\n📝 Executing bulkWrite...');
-  console.log('Number of operations:', bulkOps.length);
 
   try {
     const result = await Image.bulkWrite(bulkOps);
     console.log('✅ Bulk write result:', {
       matchedCount: result.matchedCount,
       modifiedCount: result.modifiedCount,
-      upsertedCount: result.upsertedCount,
     });
 
     res.status(200).json({
