@@ -4,19 +4,27 @@ import createHttpError from 'http-errors';
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 export const sendContactEmail = async (req, res, next) => {
-    console.log('=== ОТРИМАНО ЗАПИТ ===');
-    console.log('Headers:', JSON.stringify(req.headers, null, 2));
-    console.log('Content-Type:', req.headers['content-type']);
-    console.log('Body:', req.body);
-    console.log('Body type:', typeof req.body);
-    console.log('Body keys:', req.body ? Object.keys(req.body) : 'no body');
+  console.log('=== ОТРИМАНО ЗАПИТ ===');
+  console.log('Headers:', JSON.stringify(req.headers, null, 2));
+  console.log('Content-Type:', req.headers['content-type']);
+  console.log('Body:', req.body);
+  console.log('Body type:', typeof req.body);
+  console.log('Body keys:', req.body ? Object.keys(req.body) : 'no body');
   try {
     const { name, email, phone, comment } = req.body;
 
-    // Валідація обов'язкових полів
-    if (!name || !email || !phone) {
-      throw createHttpError(400, "Будь ласка, заповніть всі обов'язкові поля");
+    // Валідація обов'язкових полів (phone тепер не обов'язковий)
+    if (!name || !email) {
+      throw createHttpError(
+        400,
+        "Будь ласка, заповніть всі обов'язкові поля (ім'я та email)",
+      );
     }
+
+    const isDevelopment = process.env.NODE_ENV === 'development';
+    const recipientEmail = isDevelopment
+      ? 'mrakul84@gmail.com'
+      : 'info@stanislavkochubey.cz';
 
     // Валідація email формату
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -26,8 +34,8 @@ export const sendContactEmail = async (req, res, next) => {
 
     // Відправка email через Resend
     const { data, error } = await resend.emails.send({
-      from: 'Photography message <onboarding@resend.dev>',
-      to: ['info@stanislavkochubey.cz'],
+      from: `Photography Form <info@${isDevelopment ? 'resend.dev' : 'stanislavkochubey.cz'}>`,
+      to: [recipientEmail],
       subject: `Нове повідомлення від ${name}`,
       replyTo: email,
       html: `
@@ -60,10 +68,16 @@ export const sendContactEmail = async (req, res, next) => {
                 <div class="label">Email:</div>
                 <div class="value">${escapeHtml(email)}</div>
               </div>
+              ${
+                phone
+                  ? `
               <div class="field">
                 <div class="label">Телефон:</div>
                 <div class="value">${escapeHtml(phone)}</div>
               </div>
+              `
+                  : ''
+              }
               <div class="field">
                 <div class="label">Коментар:</div>
                 <div class="value">${comment ? escapeHtml(comment) : 'Без коментаря'}</div>
@@ -81,8 +95,7 @@ export const sendContactEmail = async (req, res, next) => {
         -------------------------
         Ім'я: ${name}
         Email: ${email}
-        Телефон: ${phone}
-        Коментар: ${comment || 'Без коментаря'}
+        ${phone ? `Телефон: ${phone}\n` : ''}${comment ? `Коментар: ${comment}` : 'Коментар: Без коментаря'}
 
         Повідомлення відправлено з сайту stanislavkochubey.cz
       `,
@@ -97,7 +110,7 @@ export const sendContactEmail = async (req, res, next) => {
     }
 
     // Логуємо успішну відправку
-    console.log(`Email sent successfully to mrakul84@gmail.com from ${email}`);
+    console.log(`Email sent successfully to ${recipientEmail} from ${email}`);
 
     res.status(200).json({
       message: 'Повідомлення успішно відправлено!',
